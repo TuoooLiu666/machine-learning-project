@@ -1,0 +1,463 @@
+---
+title: "prep"
+author: "LT"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(mlbench,e1071,Amelia)
+```
+
+## you must understand your data
+
+Better understanding equals better results! Try use descriptive statistics and visualization!
+
+- data cleaning
+- data transformation/feature engineering
+- modeling choice
+
+### summary
+```{r}
+data("PimaIndiansDiabetes")
+head(PimaIndiansDiabetes)
+dim(PimaIndiansDiabetes)
+sapply(PimaIndiansDiabetes, class)
+
+# class distribution
+PimaIndiansDiabetes$diabetes |> table() |> prop.table()
+
+# standard deviation
+sapply(PimaIndiansDiabetes[,1:8], sd)
+
+# skewness
+sapply(PimaIndiansDiabetes[,1:8], skewness)
+
+# correlation
+cor(PimaIndiansDiabetes[,1:8], method = 'p')
+```
+### visualization
+- univariate viz
+
+
+```{r}
+# load the data
+data(iris)
+# create histograms for each attribute
+par(mfrow=c(1,4))
+for(i in 1:4) {
+  hist(iris[,i], main=names(iris)[i])
+}
+
+# density plot
+par(mfrow=c(1,4))
+for (i in 1:4)
+  plot(density(iris[,i]), main = names(iris)[i])
+```
+```{r}
+# boxplot
+par(mfrow=c(1,4))
+for(i in 1:4) {
+  boxplot(iris[,i], main=names(iris)[i])}
+```
+
+```{r}
+# missing plot
+data(Soybean)
+Amelia::missmap(Soybean, col = c("black", "white"), legend = T)
+```
+
+- multivariate viz
+```{r}
+require(corrplot)
+
+data("iris")
+correlations <- cor(iris[,1:4])
+corrplot(correlations, method = 'pie')
+```
+```{r}
+# pair-wise scatterplots 
+pairs(iris[,1:4])
+```
+
+```{r}
+pairs(Species ~., data = iris, col = iris$Species)
+```
+
+```{r}
+require(caret)
+# density/box plots for each attribute by class value
+x <- iris[,1:4]
+y <- iris[,5]
+
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+caret::featurePlot(x=x, y=y, plot = 'box', scales=scales)
+```
+
+
+## data preprocessing
+
+- basic transformation: centering, scaling, standardization and normalization
+- power transformation like Box-Cox and Yeo-Johnson
+- many-to-many transformation, PCA/ICA
+
+Why data pre-processing?
+
+some machine learning algorithms require the data to be in a specific form, whereas other algorithms can perform better if the data is prepared in a specific way.
+
+### which preprocessing method to use?
+It's hard to know which data preprocessing methods to use. The rule of thumb is
+
+- instance based methods are more effective if the input attributes have the same scale.
+regression methods can work better if the input attributes are standardized.
+
+
+## action in R with caret
+
+`caret` transformations can be used in two ways
+
+- standalone: transformations can be modeled from training data and applied to multiple datasets. The model of the transform is prepared using the `preProcess()` function and applied to a dataset using the `predict()` function.
+- training: transformations can be modeled from training data and applied automatically during model evaluation. transformations applied during training are prepared using the `preProcess()` function and passed to the `train()` function via the preProcess argument.
+
+
+transformation methods  
+
+- BoxCox: values must be non-zero and positive
+- YeoJohnson: values can be negative
+- expoTrans: power transformation 
+- zv: remove attributes with a zero variance
+- nzv: remove attibutes with a near zero variance
+- center: divide values by standard deviation
+- scale: subtrat mean from values
+- range: normalize values
+- pca: transform data to the principle components
+- ica: transform data to independent components
+- spatiaSign: project data onto a unit circle
+
+
+```{r}
+##############################################################
+# scale transform: calculate sd for an feature and divide each value by that sd
+# center
+# standardize = center + scale to have features with mean 0 and standard deviation 1.
+##############################################################
+require(caret)
+# scale
+data("iris")
+# summarize data
+summary(iris[,1:4])
+# calculate the pre-process parameter from the dataset
+preprocessParams <- preProcess(iris[,1:4], method = c("scale", "center"))
+# apply preprocess parameters to the dataset
+transformed <- predict(preprocessParams, iris[,1:4])
+# summarize scaled results
+summary(transformed)
+```
+```{r}
+##############################################################
+# normalization: scale feature to have range of [0,1]
+##############################################################
+# summarize data
+summary(iris[,1:4])
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(iris[,1:4], method=c("range"))
+# summarize transform parameters
+print(preprocessParams)
+# transform the dataset using the parameters
+transformed <- predict(preprocessParams, iris[,1:4])
+# summarize the transformed dataset
+summary(transformed)
+```
+```{r}
+require(caret)
+require(mlbench)
+require(e1071)
+##############################################################
+# boxcox: when a feature has a Guassian-like distribution but is skewed, boxcox can shift it to reduce skewness and make it more Gaussian.
+##############################################################
+data("PimaIndiansDiabetes")
+# summarize data
+apply(PimaIndiansDiabetes[,7:8], 2, e1071::skewness)
+boxplot(PimaIndiansDiabetes[,7:8])
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(PimaIndiansDiabetes[,7:8], method=c("BoxCox"))
+# summarize transform parameters
+print(preprocessParams)
+# transform the dataset using the parameters
+transformed <- predict(preprocessParams, PimaIndiansDiabetes[,7:8])
+# summarize the transformed dataset (note pedigree and age)
+apply(transformed, 2, e1071::skewness)
+boxplot(transformed)
+```
+
+```{r}
+##############################################################
+# YeoJohnson: like boxcox, but it supports values that are equal to 0 and negative
+##############################################################
+# summarize data
+apply(PimaIndiansDiabetes[,7:8], 2, e1071::skewness)
+boxplot(PimaIndiansDiabetes[,7:8])
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(PimaIndiansDiabetes[,7:8], method=c("YeoJohnson"))
+# summarize transform parameters
+print(preprocessParams)
+# transform the dataset using the parameters
+transformed <- predict(preprocessParams, PimaIndiansDiabetes[,7:8])
+# summarize the transformed dataset (note pedigree and age)
+apply(transformed, 2, e1071::skewness)
+boxplot(transformed)
+```
+
+```{r}
+##############################################################
+# pca: the result is attributes that are uncorrelated, useful for algorithms like linear and generalized linear regression
+##############################################################
+require(mlbench)
+summary(iris)
+preprocessParams <- preProcess(iris, method = c('center', 'scale', 'pca'))
+print(preprocessParams)
+transformed <- predict(preprocessParams, iris)
+summary(transformed)
+```
+```{r}
+##############################################################
+# ica: the result is independent components, unlike PCA, ICA retains those components that are independent, thus you must specify desired independent components with the n.comp argument. this transformation may be useful for algorithms such as Naive Bayes.
+##############################################################
+require(caret)
+require(mlbench)
+# summarize dataset
+summary(PimaIndiansDiabetes[,1:8])
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(PimaIndiansDiabetes[,1:8], method=c("center", "scale",
+"ica"), n.comp=5)
+# summarize transform parameters
+print(preprocessParams)
+# transform the dataset using the parameters
+transformed <- predict(preprocessParams, PimaIndiansDiabetes[,1:8])
+# summarize the transformed dataset
+summary(transformed)
+```
+## RESAMPLING METHODS TO ESTIMATE MODEL ACCURACY
+
+- how to split data into training and assessment set?
+- how to evaluate model accuracy using bootstrap method?
+- how to evaluate model accuracy using k-fold cross-validation with and without repeats
+- how to evaluate model accuracy using LOOCV?
+
+```{r}
+require(caret)
+require(klaR)
+
+# data split: define an 80/20 split 
+trainIndex <- createDataPartition(iris$Species, 
+                                  p = .8, 
+                                  list = F)
+# split
+dataTrain <- iris[trainIndex,]
+dataTest <- iris[-trainIndex,]
+# train model
+fit <- NaiveBayes(Species ~ ., data = dataTrain)
+# predict
+predictions <- predict(fit, dataTest[,1:4])
+# summary
+confusionMatrix(predictions$class, dataTest$Species)
+```
+```{r}
+require(caret)
+# bootstrap: bootstrap resampling takes random samples from the dataset against which the model is evaluated. in aggregate, the results provide an indication of the variance of the model performance.
+
+# define training control
+trainControl <- trainControl(method = 'boot', number = 100)
+# train model
+fit <- train(Species ~ ., 
+             data = iris, 
+             trControl = trainControl,
+             method = 'nb') # specify model
+# summary
+fit
+```
+
+```{r}
+# k-fold CV/LOOCV: involves splitting the dataset into k-subsets. Each subset is held out while the model is trained on all other subsets.
+
+# define training control
+trainControl1 <- trainControl(method = 'cv', number = 10) # without repeat
+trainControl2 <- trainControl(method = 'cv', number = 10, repeats = 5) # with repeats
+trainControl3 <- trainControl(method = 'LOOCV')
+
+# train model
+fit1 <- train(Species ~ ., 
+             data = iris, 
+             trControl = trainControl1,
+             method = 'nb')
+fit2 <- train(Species ~ ., 
+             data = iris, 
+             trControl = trainControl2,
+             method = 'nb')
+fit3 <- train(Species ~ ., 
+             data = iris, 
+             trControl = trainControl3,
+             method = 'nb')
+# summary
+fit1
+fit2
+fit3
+```
+
+
+## model evaluation metrics
+
+- how to use accuracy and Kappa on classification problems?
+- how to use $RMSE$ and $R^2$ on regression problems?
+- how to use Area under ROC curve, sensitivity and specificity on binary classification problems?
+- how to use Logarithmic Loss to evaluate classifiers?
+
+
+### ACCURACY & KAPPA
+the default metrics for alforithms on binary and multi-class classification data sets in `caret`.
+
+- accuracy is useful for binary classifier
+- kappa is useful when having imbalanced classes
+```{r}
+# load packages
+require(caret)
+require(mlbench)
+# load the dataset
+data(PimaIndiansDiabetes)
+# prepare resampling method
+trainControl <- trainControl(method="cv", 
+                             number=5)
+
+set.seed(7)
+fit <- train(diabetes~., 
+             data=PimaIndiansDiabetes, 
+             method="glm", 
+             metric="Accuracy",
+             trControl=trainControl)
+# display results
+print(fit)
+```
+
+```{r}
+# load data
+data(longley)
+# prepare resampling method
+trainControl <- trainControl(method="cv", 
+                             number=5)
+set.seed(7)
+fit <- train(Employed~., 
+             data=longley, 
+             method="lm", 
+             metric="RMSE", 
+             trControl=trainControl)
+# display results
+print(fit)
+
+```
+
+## WHAT ALGORITHM SHOULD YOU USE ON YOUR DATA?
+
+- HOW TO MODEL DATA WITH LINER AND NON-LINEAR ML ALGORITHMS?
+- HOW TO SPOT-CHECK A SUITE OF LINEA AND NON-LINEAR ALGORITHMS?
+- WHICH LINEAR AND NON-LINEA ALGORITHMS TO USE?
+
+### LINEAR ALGORITHMS
+
+- linear regression
+- logistic regression
+- linear discriminant analysis
+- regularized regression
+
+```{r}
+# prepare data
+require(caret)
+require(mlbench)
+data("PimaIndiansDiabetes")
+# define train parameters
+trainControl <- trainControl(method = "repeatedcv", 
+                             number = 10,
+                             repeats = 3)
+# train liner models
+# LDA
+set.seed(7)
+fit.lda <- train(diabetes~., 
+                 data=PimaIndiansDiabetes, 
+                 method="lda", 
+                 trControl=trainControl)
+```
+
+### NON-LINEAR ALGORITHMS
+
+- k-Nearest-Neighbors
+- Naive Bayes
+- Support Vector Machine
+- classification and Regression Trees
+
+```{r}
+# SVM
+set.seed(7)
+fit.svm <- train(diabetes~., 
+                 data=PimaIndiansDiabetes, 
+                 method="svmRadial",
+                 trControl=trainControl)
+
+# KNN
+set.seed(7)
+fit.knn <- train(diabetes~., 
+                 data=PimaIndiansDiabetes, 
+                 method="knn", 
+                 trControl=trainControl)
+# CART
+set.seed(7)
+fit.cart <- train(diabetes~., 
+                  data=PimaIndiansDiabetes, 
+                  method="rpart",
+                  trControl=trainControl)
+
+# Random Forest
+set.seed(7)
+fit.rf <- train(diabetes~., 
+                data=PimaIndiansDiabetes, 
+                method="rf", 
+                trControl=trainControl)
+```
+
+### COMPARE ALGORITHM PERFORMANCE
+```{r}
+# collect resamples
+results <- resamples(list(CART=fit.cart, 
+                          LDA=fit.lda, 
+                          SVM=fit.svm, 
+                          KNN=fit.knn, 
+                          RF=fit.rf))
+
+# summarize differences between modes
+summary(results)
+
+# box and whisker plots to compare models
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+bwplot(results, scales=scales)
+dotplot(results, scales=scales)
+```
+
+## HYPERPARAMETER TUNING
+
+- HOW TO PERFORM A GRID SEARCH OR RANDOM SEARCH?
+- HOW TO USE TOOLS THAT COME WITH ALGORITHMS TO TUNE PARAMETERS?
+- HOW TO EXTEND ALGORITHM TUNING?
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
