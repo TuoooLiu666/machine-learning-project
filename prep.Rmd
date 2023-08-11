@@ -447,8 +447,59 @@ dotplot(results, scales=scales)
 - HOW TO USE TOOLS THAT COME WITH ALGORITHMS TO TUNE PARAMETERS?
 - HOW TO EXTEND ALGORITHM TUNING?
 
+### TEST ALGORITHM
 ```{r}
+# set up
+require(randomForest)
+require(caret)
+require(mlbench)
 
+# Load Dataset
+data(Sonar)
+dataset <- Sonar
+x <- dataset[,1:60]
+y <- dataset[,61]
+
+# Create model with default paramters
+trainControl <- trainControl(method="repeatedcv", 
+                             number=10, 
+                             repeats=3)
+seed <- 7
+metric <- "Accuracy"
+
+set.seed(seed)
+mtry <- sqrt(ncol(x)) # default NO. OF PREDICTORS
+tunegrid <- expand.grid(.mtry=mtry) # DEFINE GRID FOR SEARCH
+
+rfDefault <- train(Class~., 
+                   data=dataset, 
+                   method="rf", 
+                   metric=metric, 
+                   tuneGrid=tunegrid,
+                   trControl=trainControl)
+print(rfDefault)
+```
+### RANDOM SEARCH
+One strategy is to try random values within a range. Now s try a random search for `mtry` using the caret package:
+
+```{r}
+# Random Search
+trainControl <- trainControl(method="repeatedcv", 
+                             number=10, 
+                             repeats=3, 
+                             search="random")
+
+set.seed(seed)
+mtry <- sqrt(ncol(x))
+
+rfRandom <- train(Class~., 
+                  data=dataset, 
+                  method="rf", 
+                  metric=metric, 
+                  tuneLength=15,
+                  trControl=trainControl)
+print(rfRandom)
+plot(rfRandom)
 ```
 
 
