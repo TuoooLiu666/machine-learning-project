@@ -642,6 +642,7 @@ dataset$V1 <- as.numeric(as.character(dataset$V1))
 
 dataset |> colnames()
 ```
+
 ### BOOSTING ALGORITHMS
 - C5.0
 - Stochastic Gradient Boosting
@@ -734,6 +735,7 @@ dotplot(results)
 modelCor(results) # .75
 splom(results)
 ```
+
 - combine predictions of the classifiers using a simple linear model
 ```{r}
 # stack using glm
