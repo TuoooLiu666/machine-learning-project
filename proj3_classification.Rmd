@@ -1,0 +1,99 @@
+---
+title: "proj3_classification_biclass"
+author: "LT"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(caret, mlbench, tidyverse)
+```
+
+# DEFINE PROBLEM
+
+we will investigate the Wisconsin Breast Cancer Data here, and classify tumor status using the design matrix.
+
+  - LOAD PACKAGES
+  - LOAD DATASET
+  - DATA SPLIT
+  
+```{r}
+# load data
+data("BreastCancer")
+# split data
+# create a list of 80% of the rows in the original dataset we can use for training
+set.seed(7)
+validationIndex <- createDataPartition(BreastCancer$Class, p=0.80, list=FALSE)
+# select 20% of the data for validation
+validation <- BreastCancer[-validationIndex,]
+# use the remaining 80% of data to training and testing the models
+dataset <- BreastCancer[validationIndex,]
+```
+
+# SUMMARIZE DATA
+  - DESCRIPTIVE STATISTICS
+  - DATA VISUALIZATIONS
+# PREPARE DATA
+  - DATA CLEANING
+  - FEATURE SELECTION
+  - DATA ENGINEERING/TRANSFORMATION
+# EVALUATE ALGORITHMS
+  - TEST OPTIONS AND EVALUATION METRIC
+  - SPOT-CHECK ALGORITHMS
+  - COMPARE ALGORITHMS
+# IMPROVE RESULTS
+  - ALGORITHM TUNING
+  - ENSEMBLES
+# PRESENT RESULTS
+  - PREDICTIONS ON VALIDATION SET
+  - CREATE STANDALONE MODEL ON ENTIRE TRAINING SET
+  - SAVE MODEL FOR LATER USE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
