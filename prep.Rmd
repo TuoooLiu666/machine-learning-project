@@ -96,7 +96,7 @@ caret::featurePlot(x=x, y=y, plot = 'box', scales=scales)
 ```
 
 
-## data preprocessing
+## DATA PREPROCESSING
 
 - basic transformation: centering, scaling, standardization and normalization
 - power transformation like Box-Cox and Yeo-Johnson
@@ -113,7 +113,7 @@ It's hard to know which data preprocessing methods to use. The rule of thumb is
 regression methods can work better if the input attributes are standardized.
 
 
-## action in R with caret
+## ACTION with caret
 
 `caret` transformations can be used in two ways
 
@@ -306,7 +306,7 @@ fit3
 ```
 
 
-## model evaluation metrics
+## MODEL EVALUATION METRICS
 
 - how to use accuracy and Kappa on classification problems?
 - how to use $RMSE$ and $R^2$ on regression problems?
@@ -573,6 +573,8 @@ results <- resamples(modellist)
 summary(results)
 dotplot(results)
 ```
+
+
 - extend caret
 
 another approach is to create a new appraoch for caret: the is the same random forest algorithm, only modified so that it supprots tuning of multiple parameters:
@@ -611,6 +613,267 @@ custom <- train(Class~.,
 summary(custom)
 plot(custom)
 ```
+
+
+
+## ENSEMBLE
+ENSEMBLES CAN PRODUCE A BOOST IN ACCURACY AS THEY IMPROVE RESULTS BY COMBINING **PREDICTIONS** FROM MULTIPLE MODELS. 
+
+- HOW TO USE **BOOSTING** AND **BAGGING** ALGORITHMS?
+- HOW TO BLEND THE PREDICTIONS FROM MULTIPLE MODELS USING **STACKING**?
+
+
+Once WE have a shortlist of accurate models, WE can use PARAMETER tuning to get the most from each MODEL. another approach used to increase accuracy is to combine the predictions of multiple models together and get an *ensemble prediction*. popular methods for combining predictions from different models are:
+
+- *Bagging*:  building multiple models (of the same type) from different sub-samples of the training data sets.
+- *Boosting*: building multiple models (of the same type) each of which learns to fix the prediction errors of a prior model in the chain.
+- *Stacking*: building multiple models (of different types) and supervisor model that learns how to best combine the predictions of the primary models.
+
+```{r}
+require(mlbench)
+require(caret)
+require(caretEnsemble)
+
+# Load the dataset
+data(Ionosphere)
+dataset <- Ionosphere
+dataset <- dataset[,-2]
+dataset$V1 <- as.numeric(as.character(dataset$V1))
+
+dataset |> colnames()
+```
+### BOOSTING ALGORITHMS
+- C5.0
+- Stochastic Gradient Boosting
+
+```{r}
+# Example of Boosting Algorithms
+trainControl <- trainControl(method="repeatedcv", 
+                             number=10, repeats=3)
+seed <- 7
+metric <- "Accuracy"
+
+# C5.0
+set.seed(seed)
+fit.c50 <- train(Class~., data=dataset, 
+                 method="C5.0", metric=metric,
+                 trControl=trainControl)
+
+
+# Stochastic Gradient Boosting
+set.seed(seed)
+fit.gbm <- train(Class~., data=dataset, 
+                 method="gbm", metric=metric,
+                 trControl=trainControl, 
+                 verbose=FALSE)
+
+
+# summarize results
+boostingResults <- resamples(list(c5.0=fit.c50, gbm=fit.gbm))
+summary(boostingResults)
+dotplot(boostingResults)
+```
+
+### BAGGING
+- bagged classification and regression trees (CART)
+- random forest
+
+examples shown above have parameters that are not tuned here.
+```{r}
+# Example of Bagging algorithms
+trainControl <- trainControl(method="repeatedcv", 
+                             number=10, repeats=3)
+seed <- 7
+metric <- "Accuracy"
+# Bagged CART
+set.seed(seed)
+fit.treebag <- train(Class~., data=dataset, 
+                     method="treebag", metric=metric,
+                     trControl=trainControl)
+# Random Forest
+set.seed(seed)
+fit.rf <- train(Class~., data=dataset, 
+                method="rf", metric=metric, 
+                trControl=trainControl)
+# summarize results
+baggingResults <- resamples(list(treebag=fit.treebag, rf=fit.rf))
+summary(baggingResults)
+dotplot(baggingResults)
+```
+
+
+### STACKING ALGORITHMS
+given ia list of caret models and the `caretStack()` function can combine predictions of multiple models as implemented in the caretEnsemble package. 
+
+Below is an example that creates these 5 sub-models.
+- LDA
+- CART
+- KNN
+- SVM with a radial basis kernel function
+
+```{r}
+# Example of Stacking algorithms
+# create submodels
+trainControl <- trainControl(method="repeatedcv", 
+                             number=10, repeats=3,
+                             savePredictions=TRUE, 
+                             classProbs=TRUE)
+
+algorithmList <- c('lda', 'rpart', 'glm', 'knn', 'svmRadial')
+
+set.seed(seed)
+models <- caretEnsemble::caretList(Class~., data=dataset, 
+                    trControl=trainControl, 
+                    methodList=algorithmList)
+# summary
+results <- resamples(models)
+summary(results)
+dotplot(results)
+
+# correlation between results
+modelCor(results) # .75
+splom(results)
+```
+- combine predictions of the classifiers using a simple linear model
+```{r}
+# stack using glm
+stackControl <- trainControl(method="repeatedcv", 
+                             number=10, repeats=3,
+                             savePredictions=TRUE, 
+                             classProbs=TRUE)
+
+set.seed(seed)
+stack.glm <- caretEnsemble::caretStack(models, method="glm", 
+                        metric="Accuracy", 
+                        trControl=stackControl)
+
+print(stack.glm)
+```
+
+
+- combine predictions of the classifiers using random forest algorithm
+```{r}
+# stack using random forest
+set.seed(seed)
+stack.rf <- caretEnsemble::caretStack(models, method="rf", 
+                        metric="Accuracy", 
+                        trControl=stackControl)
+
+print(stack.rf)
+```
+
+## Finalize and SAVE ML MODEL
+
+- how to make prediction on new data?
+- how to recreate a well performing model from caret as a standalone model?
+- how to save model to a file, load it and make prediction on unseen data?
+
+
+### predictions
+```{r}
+# load packages
+require(caret)
+require(mlbench)
+# load dataset
+data(PimaIndiansDiabetes)
+# create 80%/20% for training and validation set
+set.seed(9)
+validationIndex <- createDataPartition(PimaIndiansDiabetes$diabetes, p=0.80, list=FALSE)
+validation <- PimaIndiansDiabetes[-validationIndex,]
+training <- PimaIndiansDiabetes[validationIndex,]
+# train a model and summarize model
+set.seed(9)
+trainControl <- trainControl(method="cv", number=10) # 10-fold CV without repeat
+fit.lda <- train(diabetes~., data=training, 
+                 method="lda", metric="Accuracy",
+                 trControl=trainControl)
+print(fit.lda)
+print(fit.lda$finalModel)
+# estimate skill on validation set
+set.seed(9)
+predictions <- predict(fit.lda, newdata=validation)
+confusionMatrix(predictions, validation$diabetes)
+```
+### creating a standalone model using all training data
+```{r}
+require(randomForest)
+# load dataset
+data(Sonar)
+set.seed(7)
+# create 80%/20% for training and validation datasets
+validationIndex <- createDataPartition(Sonar$Class, p=0.80, list=FALSE)
+validation <- Sonar[-validationIndex,]
+training <- Sonar[validationIndex,]
+# train a model and summarize model
+set.seed(7)
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=3)
+fit.rf <- train(Class~., data=training, 
+                method="rf", metric="Accuracy",
+                trControl=trainControl, ntree=2000)
+print(fit.rf)
+print(fit.rf$finalModel)
+
+# create standalone model using all training data
+set.seed(7)
+finalModel <- randomForest(Class~., data = training, 
+                           mtry=2, ntree=2000) # from final model summary
+# make a predictions on "new data" using the final model
+finalPredictions <- predict(finalModel, validation[,1:60])
+confusionMatrix(finalPredictions, validation$Class)
+```
+
+
+
+### saving the model to file for later loading and making predictions
+
+save the best model to a file so that it can be loaded up later and make predictions. We train the final model using the training set and our optimal parameters, then save it to a file called finalModel.rds in the local working directory.
+
+```{r}
+# load dataset
+data(Sonar)
+set.seed(7)
+# create 80%/20% for training and validation datasets
+validationIndex <- createDataPartition(Sonar$Class, p=0.80, list=FALSE)
+validation <- Sonar[-validationIndex,]
+training <- Sonar[validationIndex,]
+# create final standalone model using all training data
+set.seed(7)
+finalModel <- randomForest(Class~., training, mtry=2, ntree=2000)
+# save the model to disk
+saveRDS(finalModel, "./finalModel.rds")
+
+# later...
+# load the model
+superModel <- readRDS("./finalModel.rds")
+print(superModel)
+# make a predictions on "new data" using the final model
+finalPredictions <- predict(superModel, validation[,1:60])
+confusionMatrix(finalPredictions, validation$Class)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

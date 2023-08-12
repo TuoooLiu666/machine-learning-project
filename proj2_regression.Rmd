@@ -1,0 +1,394 @@
+---
+title: "regression"
+author: "LT"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(caret, mlbench, corrplot)
+```
+
+## DEFINE PROBLEM
+  - LOAD PACKAGES
+  - LOAD DATASET
+Each record in the database describes a Boston suburb or town. The data was drawn from the
+Boston Standard Metropolitan Statistical Area (SMSA) in 1970. The features have a mixture of units.  
+```{r}
+# attach the BostonHousing dataset
+data(BostonHousing)
+```
+
+  - DATA SPLIT
+```{r}
+# Split out validation dataset
+# create a list of 80% of the rows in the original dataset we can use for training
+set.seed(7)
+validationIndex <- createDataPartition(BostonHousing$medv, p = .8, list = F)
+
+# validation set
+validation <- BostonHousing[-validationIndex,]
+# training set
+dataset <- BostonHousing[validationIndex,]
+```
+
+## SUMMARIZE DATA
+  - DESCRIPTIVE STATISTICS
+```{r}
+# dimensions of training set
+dim(dataset)
+# list types for each attribute
+sapply(dataset, class)
+# take a peek at the data
+tail(dataset, n=5)
+# summarize feature distributions
+summary(dataset)
+```
+```{r}
+# convert factor to numeric tto faclitate plotting
+dataset[,4] <- as.numeric(as.character(dataset[,4]))
+# correlation matrix
+cor(dataset[,1:13])
+```
+many of the attributes have a strong correlation (e.g. $\ge 0.70$ or $\le -0.70$). This is collinearity and we may see better results with regression algorithms if the correlated features are removed.
+
+  - DATA VISUALIZATIONS
+```{r}
+# univariate
+# histograms each attribute
+par(mfrow=c(2,7))
+for(i in 1:13) {
+  hist(dataset[,i], main=names(dataset)[i])
+}
+
+
+# boxplot series
+par(mfrow=c(2,7))
+for (i in 1:13){
+  boxplot(dataset[,i], main = colnames(dataset)[i])
+}
+```
+This helps point out the skewness in many distributions so much so that data looks like outliers
+(e.g. beyond the whisker of the plots).
+
+```{r}
+# multivariate 
+# correlation plot
+correlations <- cor(dataset[,1:13])
+corrplot(corr = correlations, method = "circle", 
+         type = "lower", diag = F)
+```
+
+
+## PREPARE DATA
+  - DATA CLEANING
+  
+there is a lot of structure in this data set. it might be worth trying:
+- feature selection and removing the highly correlated features
+- normalizing the data so as to compare apple to apple
+- standardizing the data to reduce the effects of differing distributions
+- Box-Cox transformation to mitigate skewness
+
+  - FEATURE SELECTION
+
+we will first tentatively compare performance of a suite of algorithms, and then conduct feature selection.
+
+```{r}
+# find attributes that are highly corrected
+set.seed(1)
+cutoff <- 0.70
+correlations <- cor(dataset[,1:13])
+highlyCorrelated <- caret::findCorrelation(correlations, cutoff=cutoff)
+
+for (value in highlyCorrelated) {
+  print(names(dataset)[value])
+}
+# create a new dataset without highly corrected features
+datasetFeatures <- dataset[,-highlyCorrelated]
+dim(datasetFeatures)
+```
+
+
+  - DATA ENGINEERING/TRANSFORMATION
+  
+some of the features have a skewed and others perhaps have an exponential distribution. One option would be to explore squaring and log transforms respectively. Another approach would be to use a power transform and let it figure out the amount to correct each feature. 
+
+
+## EVALUATE ALGORITHMS
+  - TEST OPTIONS AND EVALUATION METRIC
+  
+We will use RMSE and $R^2$ as the evaluation metrics. RMSE gives indication of model performance with respect to prediction accuracy and $R^2$ gives idea of how good the model fits the data. 
+
+  - SPOT-CHECK ALGORITHMS
+  
+we have no idea on which algorithm(s) would be good to try out. Bu intuitively, glm, penalized glm, regression trees and SVM might be worth trying. 
+
+  - COMPARE ALGORITHMS
+  
+we decided to try a suite of 6 different algorithms capable of working with regression problem, including linear algorithms (linear regression, generalized linear regression and penalized linear regression), non-linear algorithms (classification and regression trees, support vector machines, and k-nearest neighbors).  
+```{r model_build}
+# define train parameter
+trainControl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+metric <- "RMSE"
+
+# LM
+set.seed(1)
+lm.fit <- train(medv ~ ., data = dataset, 
+                method = 'lm', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# GLM
+set.seed(1)
+glm.fit <- train(medv ~ ., data = dataset, 
+                method = 'glm', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# GLMNET
+set.seed(1)
+glmnet.fit <- train(medv ~ ., data = dataset, 
+                method = 'glmnet', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+# SVM
+set.seed(1)
+svm.fit <- train(medv ~ ., data = dataset, 
+                method = 'svmRadial', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# CART
+set.seed(1)
+grid <- expand.grid(.cp = c(0, 0.05, 0.1))
+cart.fit <- train(medv ~ ., data = dataset, 
+                method = 'rpart', metric = metric,
+                tuneGrid = grid, 
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# KNN
+set.seed(1)
+knn.fit <- train(medv ~ ., data = dataset, 
+                method = 'knn', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+```
+The algorithms all use default tuning parameters, except CART which is fussy on this
+data and has 3 default parameters specified.
+
+```{r model_comparison}
+# Compare algorithms
+results <- resamples(list(LM=lm.fit, GLM=glm.fit, 
+                          GLMNET=glmnet.fit, SVM=svm.fit,
+                          CART=cart.fit, KNN=knn.fit))
+summary(results)
+dotplot(results)
+```
+It looks like SVM has the lowest RMSE, followed closely by the other non-linear algorithms CART and KNN. The linear regression algorithms all appear to be in the same ball park and slightly worse error.
+
+After removing highly correlated features, let's compare model performance again
+```{r collinearity}
+# define train parameter
+trainControl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+metric <- "RMSE"
+
+# LM
+set.seed(1)
+lm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'lm', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# GLM
+set.seed(1)
+glm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'glm', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# GLMNET
+set.seed(1)
+glmnet.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'glmnet', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+# SVM
+set.seed(1)
+svm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'svmRadial', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# CART
+set.seed(1)
+grid <- expand.grid(.cp = c(0, 0.05, 0.1))
+cart.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'rpart', metric = metric,
+                tuneGrid = grid, 
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# KNN
+set.seed(1)
+knn.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'knn', metric = metric,
+                preProc = c("center", "scale"), 
+                trControl = trainControl)
+
+# Compare algorithms
+results <- resamples(list(LM=lm.fit, GLM=glm.fit, 
+                          GLMNET=glmnet.fit, SVM=svm.fit,
+                          CART=cart.fit, KNN=knn.fit))
+summary(results)
+dotplot(results)
+```
+```{r box-cox}
+# define train parameter
+trainControl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+metric <- "RMSE"
+
+# LM
+set.seed(1)
+lm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'lm', metric = metric,
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+
+# GLM
+set.seed(1)
+glm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'glm', metric = metric,
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+
+# GLMNET
+set.seed(1)
+glmnet.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'glmnet', metric = metric,
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+# SVM
+set.seed(1)
+svm.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'svmRadial', metric = metric,
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+
+# CART
+set.seed(1)
+grid <- expand.grid(.cp = c(0, 0.05, 0.1))
+cart.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'rpart', metric = metric,
+                tuneGrid = grid, 
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+
+# KNN
+set.seed(1)
+knn.fit <- train(medv ~ ., data = datasetFeatures, 
+                method = 'knn', metric = metric,
+                preProc = c("center", "scale", "BoxCox"), 
+                trControl = trainControl)
+
+# Compare algorithms
+results <- resamples(list(LM=lm.fit, GLM=glm.fit, 
+                          GLMNET=glmnet.fit, SVM=svm.fit,
+                          CART=cart.fit, KNN=knn.fit))
+summary(results)
+dotplot(results)
+```
+
+
+## IMPROVE RESULTS
+  - ALGORITHM TUNING
+  
+Now, we know that SVM has the best performance with respect to selected metric, after removing correlated features and power transformation. We could further improve the model performance via hyperparameter tuning on SVM.
+
+```{r}
+print(svm.fit)
+
+
+# tune SVM sigma and C parametres
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=5)
+metric <- "RMSE"
+set.seed(7)
+grid <- expand.grid(.sigma=c(0.025, 0.05, 0.1, 0.15), 
+                    .C=seq(1, 10, by=1))
+fit.svm <- train(medv~., data=dataset, method="svmRadial", 
+                 metric=metric, tuneGrid=grid,
+                 preProc=c("center", "scale","BoxCox"), 
+                 trControl=trainControl)
+print(fit.svm)
+plot(fit.svm)
+```
+The final values used for the SVM model were sigma = 0.1 and C = 9, producing an RMSE of 3.074523.
+
+  - ENSEMBLES
+
+let's try improve model performance even further via ensembles. methods used include random forest, gradient boosting machines boosting, and cubist boosting.
+
+```{r}
+# try ensembles
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=5)
+metric <- "RMSE"
+# Random Forest
+set.seed(1)
+fit.rf <- train(medv~., data=dataset, method="rf", 
+                metric=metric, preProc=c("BoxCox"),
+                trControl=trainControl)
+# Stochastic Gradient Boosting
+set.seed(1)
+fit.gbm <- train(medv~., data=dataset, 
+                 method="gbm", metric=metric, 
+                 preProc=c("BoxCox"),
+                 trControl=trainControl, verbose=FALSE)
+# Cubist
+set.seed(1)
+fit.cubist <- train(medv~., data=dataset, 
+                    method="cubist", metric=metric,
+                    preProc=c("BoxCox"), trControl=trainControl)
+# Compare algorithms
+ensembleResults <- resamples(list(RF=fit.rf, GBM=fit.gbm, CUBIST=fit.cubist))
+summary(ensembleResults)
+dotplot(ensembleResults)
+```
+
+
+## PRESENT RESULTS
+  - PREDICTIONS ON VALIDATION SET
+  - CREATE STANDALONE MODEL ON ENTIRE TRAINING SET
+  - SAVE MODEL FOR LATER USE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
