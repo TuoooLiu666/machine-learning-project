@@ -85,10 +85,10 @@ corrplot(corr = correlations, method = "circle",
   - DATA CLEANING
   
 there is a lot of structure in this data set. it might be worth trying:
-- feature selection and removing the highly correlated features
-- normalizing the data so as to compare apple to apple
-- standardizing the data to reduce the effects of differing distributions
-- Box-Cox transformation to mitigate skewness
+- `feature selection` and removing the highly `correlated` features
+- `normalizing` the data so as to compare apple to apple
+- `standardizing` the data to reduce the effects of differing distributions
+- `Box-Cox` transformation to mitigate skewness
 
   - FEATURE SELECTION
 
@@ -112,7 +112,7 @@ dim(datasetFeatures)
 
   - DATA ENGINEERING/TRANSFORMATION
   
-some of the features have a skewed and others perhaps have an exponential distribution. One option would be to explore squaring and log transforms respectively. Another approach would be to use a power transform and let it figure out the amount to correct each feature. 
+some of the features have a skewed and others perhaps have an exponential distribution. One option would be to explore `squaring and log` transforms respectively. Another approach would be to use a `power transform` and let it figure out the amount to correct each feature. 
 
 
 ## EVALUATE ALGORITHMS
@@ -122,11 +122,11 @@ We will use RMSE and $R^2$ as the evaluation metrics. RMSE gives indication of m
 
   - SPOT-CHECK ALGORITHMS
   
-we have no idea on which algorithm(s) would be good to try out. Bu intuitively, glm, penalized glm, regression trees and SVM might be worth trying. 
+we have no idea on which algorithm(s) would be good to try out. But intuitively, `glm`, `penalized glm`, `regression trees` and `SVM` might be worth trying. 
 
   - COMPARE ALGORITHMS
   
-we decided to try a suite of 6 different algorithms capable of working with regression problem, including linear algorithms (linear regression, generalized linear regression and penalized linear regression), non-linear algorithms (classification and regression trees, support vector machines, and k-nearest neighbors).  
+we decided to try a suite of 6 different algorithms capable of working with regression problem, including `linear algorithms` (linear regression, generalized linear regression and penalized linear regression), `non-linear algorithms` (classification and regression trees, support vector machines, and k-nearest neighbors).  
 ```{r model_build}
 # define train parameter
 trainControl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
@@ -251,27 +251,27 @@ metric <- "RMSE"
 
 # LM
 set.seed(1)
-lm.fit <- train(medv ~ ., data = datasetFeatures, 
+lm.fit <- train(medv ~ ., data = dataset, 
                 method = 'lm', metric = metric,
                 preProc = c("center", "scale", "BoxCox"), 
                 trControl = trainControl)
 
 # GLM
 set.seed(1)
-glm.fit <- train(medv ~ ., data = datasetFeatures, 
+glm.fit <- train(medv ~ ., data = dataset, 
                 method = 'glm', metric = metric,
                 preProc = c("center", "scale", "BoxCox"), 
                 trControl = trainControl)
 
 # GLMNET
 set.seed(1)
-glmnet.fit <- train(medv ~ ., data = datasetFeatures, 
+glmnet.fit <- train(medv ~ ., data = dataset, 
                 method = 'glmnet', metric = metric,
                 preProc = c("center", "scale", "BoxCox"), 
                 trControl = trainControl)
 # SVM
 set.seed(1)
-svm.fit <- train(medv ~ ., data = datasetFeatures, 
+svm.fit <- train(medv ~ ., data = dataset, 
                 method = 'svmRadial', metric = metric,
                 preProc = c("center", "scale", "BoxCox"), 
                 trControl = trainControl)
@@ -279,7 +279,7 @@ svm.fit <- train(medv ~ ., data = datasetFeatures,
 # CART
 set.seed(1)
 grid <- expand.grid(.cp = c(0, 0.05, 0.1))
-cart.fit <- train(medv ~ ., data = datasetFeatures, 
+cart.fit <- train(medv ~ ., data = dataset, 
                 method = 'rpart', metric = metric,
                 tuneGrid = grid, 
                 preProc = c("center", "scale", "BoxCox"), 
@@ -287,7 +287,7 @@ cart.fit <- train(medv ~ ., data = datasetFeatures,
 
 # KNN
 set.seed(1)
-knn.fit <- train(medv ~ ., data = datasetFeatures, 
+knn.fit <- train(medv ~ ., data = dataset, 
                 method = 'knn', metric = metric,
                 preProc = c("center", "scale", "BoxCox"), 
                 trControl = trainControl)
@@ -413,6 +413,7 @@ print(r2)
 
   - CREATE STANDALONE MODEL ON ENTIRE TRAINING SET
   - SAVE MODEL FOR LATER USE
+
 
 
 
