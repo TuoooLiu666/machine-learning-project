@@ -33,7 +33,63 @@ dataset <- BreastCancer[validationIndex,]
 
 # SUMMARIZE DATA
   - DESCRIPTIVE STATISTICS
+  
+```{r}
+# dimensions of data
+dim(dataset)
+# peek
+tail(dataset, n=5)
+# classes
+sapply(dataset, class)
+# Remove redundant variable Id
+dataset <- dataset[,-1]
+# convert input values to numeric
+for(i in 1:9) {
+  dataset[,i] <- as.numeric(as.character(dataset[,i]))
+}
+# class distribution
+cbind(freq=table(dataset$Class), percentage=prop.table(table(dataset$Class))*100)
+
+# summarize correlations between input variables
+complete_cases <- stats::complete.cases(dataset)
+cor(dataset[complete_cases,1:9])
+```
+factors might be easier for modeling with decision tree algorithms. Note there is an ordinal relationship between the levels, converting factors can retain that structure to other algorithms.
+
+There is a 65% to 35% split for benign-malignant in the class values which is
+imbalanced.
+
   - DATA VISUALIZATIONS
+```{r univariate}
+# histograms each attribute
+par(mfrow=c(3,3))
+for(i in 1:9) {
+  hist(dataset[,i], main=names(dataset)[i])
+}
+# density plot for each attribute
+par(mfrow=c(3,3))
+for(i in 1:9) {
+  plot(density(dataset[complete_cases,i]), main=names(dataset)[i])
+}
+# boxplots for each attribute
+par(mfrow=c(3,3))
+for(i in 1:9) {
+  boxplot(dataset[,i], main=names(dataset)[i])
+}
+```
+almost all of the distributions have an exponential or *bimodal* shape to them. We may benefit from log transforms or other power transforms later on.
+
+```{r multivariate}
+# bar plots of each variable by class
+par(mfrow=c(3,3))
+for(i in 1:9) {
+    barplot(table(dataset$Class,dataset[,i]), 
+            main=names(dataset)[i],
+            legend.text=unique(dataset$Class))
+}
+```
+
+
 # PREPARE DATA
   - DATA CLEANING
   - FEATURE SELECTION
