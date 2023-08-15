@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # DEFINE PROBLEM
-DNA stands for deoxyribonucleic acid, and is the basic material that makes
+" DNA stands for deoxyribonucleic acid, and is the basic material that makes
 up human chromosomes. DNA microarrays measure the expression of a gene in a cell by measuring the amount of mRNA (messenger ribonucleic acid) present for that gene.
 
 How does a DNA microarray work? The nucleotide sequences for a few thousand geens are printed on a glass slide. A target sample and a reference
@@ -18,7 +18,14 @@ sample are labeled with red and green dyes, and each are hybridized with
 the DNA on the slide. Through fluoroscopy, the log (red/green) intensities
 of RNA hybridizing at each site is measured. The result is a few thousand
 numbers, typically ranging from say −6 to 6, measuring the expression level
-of each gene in the target relative to the reference sample.
+of each gene in the target relative to the reference sample." 
+
+Above description on DNA is from the Elements of Statistical Learning, and the DNA expression microarray data being used here consists of 64 samples (columns) of cancer tumors from different patients, and 6830 genes (rows). 
+
+The task here is to understand how the genes and sample are organized.   
+- which samples are most similar, with respect to their expression profiles across genes?
+- which genes are most similar, with respect to their expression profiles across samples?
+- do certain gene(s) exhibit high (or low) expression in certain sample?
 
   - LOAD PACKAGES
   - LOAD DATASET
