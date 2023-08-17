@@ -1,0 +1,127 @@
+---
+title: "clustering"
+subtitle: "proj5_gene_expression"
+author: "LT"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(factoextra, tidyverse, cluster, stats, ComplexHeatmap)
+```
+
+# clustering
+
+- standardization is necessary: de-unit is mandatory for clustering so we are comparing apple to apple.
+
+```{r}
+# data
+require(ComplexHeatmap)
+# data readin
+expr <- readRDS(paste0(system.file(package = "ComplexHeatmap"),
+                       "/extdata/gene_expression.rds"))
+# extract numeric columns
+mat <- as.matrix(expr[, grep("cell", colnames(expr))])
+mat_t <- t(mat) |> scale()
+```
+## k-means clustering
+- observe for the "elbow"
+- Cons
+  - requires prior knowledge of the data and prespecified K
+  - sensitive to outliers
+  - high variances to K
+  - ordering rows changes outcomes
+```{r}
+# how to choose the number of clusters (K)?
+fviz_nbclust(mat_t, kmeans, method = "wss") +
+  geom_vline(xintercept = 3, linetype = 2)
+
+# PAM
+fviz_nbclust(mat_t, pam, method = "silhouette")+
+  theme_classic()
+```
+
+
+## Hierarchical Clustering
+```{r}
+# Compute the dissimilarity matrix
+res.dist <- dist(mat_t, method = "euclidean") 
+# linkage: take distance matrix and compute dissimilarity among groups
+res.hc <- hclust(d = res.dist, method = "ward.D2")
+
+
+# Cut in 4 groups and color by groups
+fviz_dend(res.hc, k = 3, # Cut in 3 groups
+          cex = 0.5, # label size
+          k_colors = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+          color_labels_by_k = TRUE, # color labels by groups
+          rect = TRUE # Add rectangle around groups
+          )
+```
+# heatmap
+
+```{r}
+# make HeatmapAnnotation 
+type <- gsub("s\\d+_", "", colnames(mat)) # cell type
+ha = HeatmapAnnotation(df = data.frame(type = type),
+                       which = "column",
+                       height = unit(4, "mm"))
+
+# plot
+set.seed(1)
+Heatmap(mat, name = "expression", 
+        km = 3, # cut to 5 clusters
+        top_annotation = ha,
+        show_row_names = F, 
+        show_column_names = T,
+        show_heatmap_legend = T) +
+Heatmap(expr$type, name = "type", width = unit(5, "mm")) +
+Heatmap(expr$length, name = "length", width = unit(5, "mm"),
+        col = circlize::colorRamp2(c(0, 100000), c("white", "orange")))
+```
+
+
+```{r}
+###################################################
+# another way: add descriptive information for genes 
+# as annotations
+###################################################
+# Define some graphics to display the distribution of rows
+ha_mix_right = HeatmapAnnotation(type = expr$type, 
+                                 legnth = expr$length,
+                                 which = "row", 
+                                 width = unit(4, "cm"))
+
+# plot
+Heatmap(mat, name = "expression", 
+        km = 3, # cut to 3 clusters
+        top_annotation = ha,
+        show_row_names = F, 
+        show_column_names = T,
+        show_heatmap_legend = T) + 
+  ha_mix_right
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -8,3 +8,6 @@
   
 - proj 3: binary classification
   - data: Breast Cancer
+  
+- proj 4: DNA expression microarray 
+  - data : DNA expression 

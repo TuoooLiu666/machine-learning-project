@@ -1,0 +1,294 @@
+---
+title: "clustering_prep"
+author: "LT"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(factoextra, tidyverse, cluster, stats)
+```
+
+# clustering
+
+- standardization is necessary: de-unit is mandatory for clustering so we are comparing apple to apple.
+
+```{r}
+# data
+data("USArrests")  # Load the data set
+df <- USArrests    # Use df as shorter name
+df |> head(5)
+# remove NA
+df <- na.omit(df)
+# preprocess
+df <- scale(df)
+```
+## k-means clustering
+```{r}
+require(stats) # for kmeans()
+require(factoextra) # for vizing clustering results
+
+# how to choose the number of clusters (K)?
+fviz_nbclust(df, kmeans, method = "wss") +
+  geom_vline(xintercept = 4, linetype = 2)
+
+# Compute k-means with k = 4
+set.seed(1)
+km.res <- kmeans(df, centers = 4, nstart = 25)
+
+# viz kmeans clusters
+fviz_cluster(km.res, data = df,
+            palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+            ellipse.type = "euclid", # Concentration ellipse
+            star.plot = F, # Add segments from centroid to items
+            repel = TRUE, # Avoid label overplotting (slow)
+            ggtheme = theme_minimal()
+)
+```
+- observe for the "elbow"
+- Cons
+  - requires prior knowledge of the data and prespecified K
+  - sensitive to outliers
+  - high variances to K
+  - ordering rows changes outcomes
+
+## PAM 
+- alternative to k-means that is less sensitive to outliers.
+
+```{r}
+require(cluster) # for pam()
+
+# determine K
+fviz_nbclust(df, pam, method = "silhouette")+
+  theme_classic()
+
+# pam
+pam.res <- pam(df, 2)
+
+# viz
+fviz_cluster(pam.res,
+             geom = c("point", "text"),
+             palette = c("#00AFBB", "#FC4E07"), # color palette
+             ellipse.type = "t", # Concentration ellipse
+             repel = TRUE, # Avoid label overplotting (slow)
+             ggtheme = theme_classic()
+             )
+```
+## Hierarchical Clustering
+- Complete linkage and Ward’s minimal inter-cluster variance method are generally preferred. 
+- The higher the height of the fusion, the less similar the objects are.
+- remember to verify clustering results by correlating the cophenetic distance to original distance
+```{r}
+# Compute the dissimilarity matrix
+res.dist <- dist(df, method = "euclidean") 
+# linkage: take distance matrix and compute dissimilarity among groups
+res.hc <- hclust(d = res.dist, method = "ward.D2")
+
+# viz dendrogram
+fviz_dend(res.hc, cex = .5)
+
+# Cut in 4 groups and color by groups
+fviz_dend(res.hc, k = 4, # Cut in 4 groups
+          cex = 0.5, # label size
+          k_colors = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+          color_labels_by_k = TRUE, # color labels by groups
+          rect = TRUE # Add rectangle around groups
+          )
+```
+
+```{r}
+# horizontal dendrogram
+fviz_dend(res.hc, k = 4, 
+          cex = 0.4, 
+          horiz = TRUE, 
+          k_colors = "jco",
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+
+# circular/phylogenic
+fviz_dend(res.hc, k = 4, 
+          cex = 0.4, 
+          horiz = TRUE, 
+          k_colors = "jco",
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE,
+          type = "circular")
+```
+```{r}
+# Create a plot of the whole dendrogram,
+# and extract the dendrogram data
+dend_plot <- fviz_dend(res.hc, k = 4, # Cut in four groups
+                       cex = 0.5, # label size
+                       k_colors = "jco"
+                       )
+dend_data <- attr(dend_plot, "dendrogram") # Extract dendrogram data
+# Cut the dendrogram at height h = 10
+dend_cuts <- cut(dend_data, h = 10)
+# Visualize the truncated version containing
+# two branches
+fviz_dend(dend_cuts$upper)
+# plot whole dendrogram
+print(dend_plot)
+# Plot subtree 1
+fviz_dend(dend_cuts$lower[[1]], main = "Subtree 1")
+# Plot subtree 2
+fviz_dend(dend_cuts$lower[[2]], main = "Subtree 2", 
+          type = "circular",  
+          repel = TRUE)
+```
+```{r}
+# customization with dendextend
+require(dendextend)
+# 1. Create a customized dendrogram
+mycols <- c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07")
+dend <- as.dendrogram(res.hc) %>%
+    set("branches_lwd", 1) %>% # Branches line width
+    set("branches_k_color", mycols, k = 4) %>% # Color branches by groups
+    set("labels_colors", mycols, k = 4) %>% # Color labels by groups
+    set("labels_cex", 0.5) # Change label size
+# 2. Create plot
+fviz_dend(dend)
+```
+
+```{r}
+# save dendrogram
+pdf("dendrogram.pdf", width=30, height=15) # Open a PDF
+p <- fviz_dend(res.hc, k = 4, cex = 1, k_colors = "jco" ) # Do plotting
+print(p)
+dev.off()
+```
+
+# heatmap
+- another way to visualize hierarchical clustering where data values are converted to color scale.
+
+```{r}
+require(stats) # heatmap()
+require(gplots) # heatmap.2() enhanced heatmap
+require(pheatmap) # Draws pretty heatmaps and provides more control to change the appearance
+require(d3heamap) # interactive heatmap
+require(ComplexHeatmap) # Draws, annotates and arranges complex heatmaps (very useful for genomic)
+```
+
+```{r}
+df <- scale(mtcars)
+# base
+heatmap(df, scale = "none")
+# Use RColorBrewer color palette names
+require("RColorBrewer")
+col <- colorRampPalette(brewer.pal(10, "RdYlBu"))(256)
+heatmap(df, scale = "none", col = col,
+        RowSideColors = rep(c("blue", "pink"), each = 16),
+        ColSideColors = c(rep("purple", 5), rep("orange", 6)))
+```
+```{r}
+# enhanced version
+require(ComplexHeatmap)
+Heatmap(df, 
+        name = "mtcars", # title of legend
+        column_title = "Variables", 
+        row_title = "Samples",
+        show_column_names = T,
+        show_row_names = T,
+        show_column_dend = T,
+        show_row_dend = T,
+         clustering_distance_rows = "euclidean",
+        clustering_method_rows = "ward.D2",
+        row_names_gp = gpar(fontsize = 7)) # Text size for row names)
+
+# Splitting heatmap by rows
+Heatmap(df, 
+        split = mtcars$cyl, 
+        name = "mtcars", # title of legend
+        row_names_gp = gpar(fontsize = 7))
+
+# Split by combining multiple variables
+Heatmap(df, name ="mtcars",
+        split = data.frame(cyl = mtcars$cyl, am = mtcars$am))
+
+############################################################
+# annotation
+############################################################
+# Annotation data frame
+annot_df <- data.frame(cyl = mtcars$cyl, 
+                       am = mtcars$am,
+                       mpg = mtcars$mpg)
+# Define colors for each levels of qualitative variables
+# Define gradient color for continuous variable (mpg)
+col = list(cyl = c("4" = "green", "6" = "gray", "8" = "darkred"),
+           am = c("0" = "yellow", "1" = "orange"),
+           mpg = circlize::colorRamp2(c(17, 25),
+                                      c("lightblue", "purple")) 
+           )
+# Create the heatmap annotation
+ha <- HeatmapAnnotation(df = annot_df, col = col, 
+                        show_legend = F)
+# Combine the heatmap and the annotation
+Heatmap(t(df), name = "mtcars",
+        top_annotation = ha)
+```
+
+```{r}
+# complex Annotation 
+df <- t(df)
+# Define some graphics to display the distribution of columns
+.hist = anno_histogram(df, 
+                       gp = gpar(fill = "lightblue"))
+.density = anno_density(df, type = "line", 
+                        gp = gpar(col = "blue"))
+
+ha_mix_top = HeatmapAnnotation(hist = .hist, 
+                               density = .density, 
+                               which = "column",
+                               height = unit(3, "cm"))
+# Define some graphics to display the distribution of rows
+.violin = anno_density(df, type = "violin",
+                       gp = gpar(fill = "lightblue"), 
+                       which = "row")
+.boxplot = anno_boxplot(df, which = "row")
+
+ha_mix_right = HeatmapAnnotation(violin = .violin, 
+                                 bxplt = .boxplot,
+                                 which = "row", 
+                                 width = unit(4, "cm"))
+# Combine annotation with heatmap
+Heatmap(df, name = "mtcars",
+        column_names_gp = gpar(fontsize = 8),
+        top_annotation = ha_mix_top) + 
+  ha_mix_right
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

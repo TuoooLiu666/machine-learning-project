@@ -1,5 +1,6 @@
 ---
-title: "proj4_DNA_expression_microarrays"
+title: "clustering"
+subtitle: "proj4_DNA_expression_microarrays"
 author: "LT"
 date: "`r Sys.Date()`"
 output: html_document

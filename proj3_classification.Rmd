@@ -1,5 +1,6 @@
 ---
-title: "proj3_classification_biclass"
+title: "Classification_biclass"
+subtitle: "proj3_classification_biclass"
 author: "LT"
 date: "`r Sys.Date()`"
 output: html_document
