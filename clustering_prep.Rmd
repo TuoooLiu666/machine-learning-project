@@ -75,6 +75,7 @@ fviz_cluster(pam.res,
              ggtheme = theme_classic()
              )
 ```
+
 ## Hierarchical Clustering
 - Complete linkage and Ward’s minimal inter-cluster variance method are generally preferred. 
 - The higher the height of the fusion, the less similar the objects are.
@@ -161,7 +162,7 @@ print(p)
 dev.off()
 ```
 
-# heatmap
+## heatmap
 - another way to visualize hierarchical clustering where data values are converted to color scale.
 
 ```{r}
@@ -260,9 +261,147 @@ Heatmap(df, name = "mtcars",
   ha_mix_right
 ```
 
+# dimenson reduction: maximizing similarity
+- t-SNE is one of the most popular non-linear dimension-reduction algorithms, as compared to PCA which is linear. It measures the distance between each observation in the data set and every other observation, and then randomizes the observations across (usually) two new axes. The observations are then iteratively shuffled around these new axes until their distances to each other in this two-dimensional space are as similar to the distances in the original high-dimensional space as possible.
+  - outperforms PCA
+  - It is infamously computationally expensive
+  - It cannot project new data onto the embedding
+  - Distances between clusters often don’t mean anything
+  - We need to select sensible values for a number of hyperparameters
+
+- UMAP is another nonlinear dimension-reduction algorithm that improves upon t-SNE. It works similarly to t-SNE (finds distances in a feature space with many variables and then tries to reproduce these distances in low-dimensional space), but differs in the way it measures distances.
+  - faster than t-sne
+  - a deterministic algorithm
+  - UMAP preserves both local and global structure: not only can we interpret two cases close to each other in lower dimensions as being similar to each other in high dimensions, but we can also interpret two clusters of cases close to each other as being more similar to each other in high dimensions.
+  
+- overall
+  - They can learn nonlinear patterns in the data.
+  - They tend to separate clusters of cases better than PCA.
+  - UMAP can make predictions on new data.
+  - UMAP is computationally inexpensive.
+  - UMAP preserves both local and global distances.
+- but
+  -  The new axes of t-SNE and UMAP are not directly
+  interpretable in terms of the original variables.
+  - t-SNE cannot make predictions on new data (different result each time).
+  - t-SNE is computationally expensive.
+  - t-SNE doesn’t necessarily preserve global structure.
+  - They cannot handle categorical variables natively.
+  
+## t-sne
+```{r}
+require(Rtsne)
+require(tidyverse)
+
+# LOADING DATA ----
+data(banknote, package = "mclust")
+swissTib <- as_tibble(banknote)
+swissTib
+```
+```{r}
+# CREATE GRID OF t-SNE HYPERPARAMETERS ----
+tsneHyperPars <- expand.grid(perplexity = c(1, 10, 30, 40, 50), 
+                             theta      = seq(0.0, 1.0, 0.25),
+                             eta        = c(1, 100, 200, 300, 400),
+                             max_iter   = c(100, 300, 500, 700, 1000))
+
+tsne <- pmap(tsneHyperPars, Rtsne, X = swissTib[, -1], verbose = TRUE)
+
+tsneTib <- tibble(perplexity = rep(tsneHyperPars$perplexity, each = 200),
+                  theta      = rep(tsneHyperPars$theta, each = 200),
+                  eta        = rep(tsneHyperPars$eta, each = 200),
+                  max_iter   = rep(tsneHyperPars$max_iter, each = 200),
+                  tSNE1      = unlist(map(tsne, ~.$Y[, 1])),
+                  tSNE2      = unlist(map(tsne, ~.$Y[, 2])))
+
+klTib <- mutate(tsneHyperPars, 
+                KL = map(tsne, ~round(tail(.$itercosts, 1), 3)))
+
+filter(tsneTib, eta == 200, max_iter == 1000) %>%
+  ggplot(aes(tSNE1, tSNE2)) +
+  facet_grid(theta ~ perplexity) +
+  geom_text(data = filter(klTib, eta == 200, max_iter == 1000), 
+            aes(label = KL), x = -80, y = -80) +
+  geom_point() +
+  theme_bw()
+```
+```{r}
+filter(tsneTib, perplexity == 30, theta == 0.5) %>%
+  ggplot(aes(tSNE1, tSNE2)) +
+  facet_grid(max_iter ~ eta) +
+  geom_text(data = filter(klTib, perplexity == 30, theta == 0.5),
+            aes(label = KL), x = -50, y = -40) +
+  geom_point() +
+  theme_bw()
+
+# FINAL t-SNE ----
+swissTsne <- select(swissTib, -Status) %>%
+  Rtsne(perplexity = 30, theta = 0, max_iter = 5000, verbose = TRUE)
+
+swissTibTsne <- swissTib %>%
+  mutate_if(.funs = scale, .predicate = is.numeric, scale = FALSE) %>% # center variables
+  mutate(tSNE1 = swissTsne$Y[, 1], tSNE2 = swissTsne$Y[, 2]) %>%
+  gather(key = "Variable", value = "Value", c(-tSNE1, -tSNE2, -Status))
+
+ggplot(swissTibTsne, aes(tSNE1, tSNE2, col = Value, shape = Status)) +
+  facet_wrap(~ Variable) +
+  geom_point(size = 3) +
+  scale_color_gradient(low = "dark blue", high = "cyan") +
+  theme_bw()
+```
 
 
+## umap
+```{r}
+require(umap)
+# CREATE GRID OF UMAP HYPERPARAMETERS ----
+umapHyperPars <- expand.grid(n_neighbors = seq(3, 19, 4),
+                             min_dist    = seq(0.1, 0.5, 0.1),
+                             metric      = c("euclidean", "manhattan"),
+                             n_epochs    = seq(50, 400, 75))
 
+umap <- pmap(umapHyperPars, umap, d = swissTib[, -1], verbose = TRUE)
+
+umapTib <- tibble(n_neighbors = rep(umapHyperPars$n_neighbors, each = 200),
+                  min_dist      = rep(umapHyperPars$min_dist, each = 200),
+                  metric        = rep(umapHyperPars$metric, each = 200),
+                  n_epochs   = rep(umapHyperPars$n_epochs, each = 200),
+                  UMAP1      = unlist(map(umap, ~.$layout[, 1])),
+                  UMAP2      = unlist(map(umap, ~.$layout[, 2])))
+
+filter(umapTib, metric == "euclidean", n_epochs == 200) %>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  facet_grid(n_neighbors ~ min_dist) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+filter(umapTib, n_neighbors == 15, min_dist == 0.1) %>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  facet_grid(metric ~ n_epochs) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+# FINAL UMAP ----
+swissUmap <- select(swissTib, -Status) %>%
+  as.matrix() %>%
+  umap(n_neighbors = 7, min_dist = 0.1,
+       metric = "manhattan", n_epochs = 200, verbose = TRUE)
+
+swissTibUmap <- swissTib %>%
+  mutate_if(.funs = scale, .predicate = is.numeric, scale = FALSE) %>% # center variables
+  mutate(UMAP1 = swissUmap$layout[, 1], UMAP2 = swissUmap$layout[, 2]) %>%
+  gather(key = "Variable", value = "Value", c(-UMAP1, -UMAP2, -Status))
+
+ggplot(swissTibUmap, aes(UMAP1, UMAP2, col = Value, shape = Status)) +
+  facet_wrap(~ Variable) +
+  geom_point(size = 3) +
+  scale_color_gradient(low = "dark blue", high = "cyan") +
+  theme_bw()
+```
 
 
 
