@@ -1,5 +1,5 @@
 ---
-title: "clustering"
+title: "clustering_example"
 subtitle: "proj5_gene_expression"
 author: "LT"
 date: "`r Sys.Date()`"
