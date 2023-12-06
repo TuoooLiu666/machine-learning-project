@@ -105,10 +105,7 @@ Heatmap(mat, name = "expression",
 
 
 
-```{r}
-require(RColorBrewer)
-color_palette <- brewer.pal(n = 6, palette = "Set3")
-```
+
 
 
 

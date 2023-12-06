@@ -9,9 +9,107 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## data read-in
+# DEFINE PROBLEM
 
-## data preprocessing
+- What is Customer Segmentation?
+Customer Segmentation is the process of division of customer base into several groups of individuals that share a similarity in different ways that are relevant to marketing such as gender, age, interests, and miscellaneous spending habits. Customer Segmentation is one the most important applications of unsupervised learning. Using clustering techniques, companies can identify the several segments of customers allowing them to target the potential user base.
 
-## k-means
+  - LOAD PACKAGES
+  - LOAD DATASET
+  - DATA SPLIT
+```{r}
+customer_data <- read.csv("./data/Mall_Customers.csv")
+```
+
+# SUMMARIZE DATA
+  - DESCRIPTIVE STATISTICS
+  - DATA VISUALIZATIONS
+```{r}
+dim(customer_data)
+str(customer_data)
+names(customer_data)
+
+# Gender Visualization
+a=table(customer_data$Gender)
+barplot(a,main="Using BarPlot to display Gender Comparision",
+       ylab="Count",
+       xlab="Gender",
+       col=rainbow(2),
+       legend=rownames(a))
+
+# Visualization of Age Distribution
+boxplot(customer_data$Age,
+       col="red",
+       main="Boxplot for Descriptive Analysis of Age")
+
+# Spending Score of the Customers
+boxplot(customer_data$Spending.Score..1.100.,
+   horizontal=TRUE,
+   col="#990000",
+   main="BoxPlot for Descriptive Analysis of Spending Score")
+```
+
+# PREPARE DATA
+  - DATA CLEANING
+  - FEATURE SELECTION
+  - DATA ENGINEERING/TRANSFORMATION
+  
+# EVALUATE ALGORITHMS
+K-means Algorithm
+
+When using the k-means clustering algorithm, the first step is to indicate the number of clusters ($k$) that we wish to produce in the final output. The algorithm starts by selecting $k$ objects from dataset randomly that will serve as the initial centers for our clusters. These selected objects are the cluster means, also known as `centroids`. Then, the remaining objects have an assignment of the closest centroid. This centroid is defined by the Euclidean Distance present between the object and the cluster mean. We refer to this step as “cluster assignment”. When the assignment is complete, the algorithm proceeds to calculate new mean value of each cluster present in the data. After the recalculation of the centers, the observations are checked if they are closer to a different cluster. Using the updated cluster, the objects are reassigned to closest center. This goes on until the cluster assignments stop changing. 
+
+## TEST OPTIONS AND EVALUATION METRIC
+
+Determining Optimal Clusters
+While working with clusters, you need to specify the number of clusters to use. You would like to utilize the optimal number of clusters. To help you in determining the optimal clusters, there are three popular methods:
+
+- Elbow method
+```{r}
+k.values <- 1:10
+
+wc <- numeric(length = 10L)
+for (k in k.values){
+  wc[k] <- kmeans(customer_data[,3:5],k,iter.max=100)$tot.withinss
+}
+  
+plot(k.values, wc, type = "b",
+     xlab = "Number of clusters K",
+     ylab = "Total within-cluster sum of squares")
+```
+
+
+- Sihouette method
+
+With the average silhouette method, we can measure the quality of our clustering operation, which helps determine how well within the cluster is the data object. If we obtain a high average silhouette width, it means that we have good clustering. The average silhouette method calculates the mean of silhouette observations for different k values. With the optimal number of k clusters, one can maximize the average silhouette over significant values for k clusters.
+
+```{r message=FALSE}
+require(factoextra)
+fviz_nbclust(customer_data[,3:5], kmeans, method = "silhouette")
+```
+
+
+- Gap statistic
+
+Using the gap statistic, one can compare the total intracluster variation for different values of k along with their expected values under the null reference distribution of data. With the help of Monte Carlo simulations, one can produce the sample dataset. For each variable in the dataset, we can calculate the range between min(xi) and max (xj) through which we can produce values uniformly from interval lower bound to upper bound.
+
+```{r}
+require(cluster)
+set.seed(125)
+stat_gap <- clusGap(customer_data[,3:5], FUN = kmeans, nstart = 25,
+            K.max = 10, B = 50)
+fviz_gap_stat(stat_gap)
+```
+
+## SPOT-CHECK ALGORITHMS
+## COMPARE ALGORITHMS
+
+# IMPROVE RESULTS
+  - ALGORITHM TUNING
+  - ENSEMBLES
+  
+# PRESENT RESULTS
+  - PREDICTIONS ON VALIDATION SET
+  - CREATE STANDALONE MODEL ON ENTIRE TRAINING SET
+  - SAVE MODEL FOR LATER USE
 

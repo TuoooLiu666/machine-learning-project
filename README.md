@@ -11,3 +11,6 @@
   
 - proj 4: DNA expression microarray 
   - data : DNA expression 
+  
+- proj 6: customer segmentation
+  - data: Kaggle
